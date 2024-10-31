@@ -1,85 +1,79 @@
-#include "Arduino.h"
+/*
+Advanced_I2C.ino
+Brian R Taylor
+brian.taylor@bolderflight.com
+
+Copyright (c) 2017 Bolder Flight Systems
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software 
+and associated documentation files (the "Software"), to deal in the Software without restriction, 
+including without limitation the rights to use, copy, modify, merge, publish, distribute, 
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or 
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING 
+BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, 
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 #include "MPU9250.h"
 
-uint8_t addrs[7] = {0};
-uint8_t device_count = 0;
-
-template <typename WireType = TwoWire>
-void scan_mpu(WireType& wire = Wire) {
-    Serial.println("Searching for i2c devices...");
-    device_count = 0;
-    for (uint8_t i = 0x68; i < 0x70; ++i) {
-        wire.beginTransmission(i);
-        if (wire.endTransmission() == 0) {
-            addrs[device_count++] = i;
-            delay(10);
-        }
-    }
-    Serial.print("Found ");
-    Serial.print(device_count, DEC);
-    Serial.println(" I2C devices");
-
-    Serial.print("I2C addresses are: ");
-    for (uint8_t i = 0; i < device_count; ++i) {
-        Serial.print("0x");
-        Serial.print(addrs[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
-}
-
-template <typename WireType = TwoWire>
-uint8_t readByte(uint8_t address, uint8_t subAddress, WireType& wire = Wire) {
-    uint8_t data = 0;
-    wire.beginTransmission(address);
-    wire.write(subAddress);
-    wire.endTransmission(false);
-    wire.requestFrom(address, (size_t)1);
-    if (wire.available()) data = wire.read();
-    return data;
-}
+// an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
+MPU9250 IMU(Wire,0x68);
+int status;
 
 void setup() {
-    Serial.begin(115200);
-    Serial.flush();
-    Wire.begin();
-    delay(2000);
+  // serial to display data
+  Serial.begin(115200);
+  while(!Serial) {}
 
-    scan_mpu();
-
-    if (device_count == 0) {
-        Serial.println("No device found on I2C bus. Please check your hardware connection");
-        while (1)
-            ;
-    }
-
-    // check WHO_AM_I address of MPU
-    for (uint8_t i = 0; i < device_count; ++i) {
-        Serial.print("I2C address 0x");
-        Serial.print(addrs[i], HEX);
-        byte ca = readByte(addrs[i], WHO_AM_I_MPU9250);
-        if (ca == MPU9250_WHOAMI_DEFAULT_VALUE) {
-            Serial.println(" is MPU9250 and ready to use");
-        } else if (ca == MPU9255_WHOAMI_DEFAULT_VALUE) {
-            Serial.println(" is MPU9255 and ready to use");
-        } else if (ca == MPU6500_WHOAMI_DEFAULT_VALUE) {
-            Serial.println(" is MPU6500 and ready to use");
-        } else {
-            Serial.println(" is not MPU series");
-            Serial.print("WHO_AM_I is ");
-            Serial.println(ca, HEX);
-            Serial.println("Please use correct device");
-        }
-        static constexpr uint8_t AK8963_ADDRESS {0x0C};  //  Address of magnetometer
-        static constexpr uint8_t AK8963_WHOAMI_DEFAULT_VALUE {0x48};
-        byte cb = readByte(AK8963_ADDRESS, AK8963_WHO_AM_I);
-        if (cb == AK8963_WHOAMI_DEFAULT_VALUE) {
-            Serial.print("AK8963 (Magnetometer) is ready to use");
-        } else {
-            Serial.print("AK8963 (Magnetometer) was not found");
-        }
-    }
+  // start communication with IMU 
+  status = IMU.begin();
+  if (status < 0) {
+    Serial.println("IMU initialization unsuccessful");
+    Serial.println("Check IMU wiring or try cycling power");
+    Serial.print("Status: ");
+    Serial.println(status);
+    while(1) {}
+  }
+  // setting the accelerometer full scale range to +/-8G 
+  IMU.setAccelRange(MPU9250::ACCEL_RANGE_8G);
+  // setting the gyroscope full scale range to +/-500 deg/s
+  IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
+  // setting DLPF bandwidth to 20 Hz
+  IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_20HZ);
+  // setting SRD to 19 for a 50 Hz update rate
+  IMU.setSrd(19);
 }
 
 void loop() {
+  // read the sensor
+  IMU.readSensor();
+
+  // display the data
+  Serial.print(IMU.getAccelX_mss(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getAccelY_mss(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getAccelZ_mss(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getGyroX_rads(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getGyroY_rads(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getGyroZ_rads(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getMagX_uT(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getMagY_uT(),6);
+  Serial.print("\t");
+  Serial.print(IMU.getMagZ_uT(),6);
+  Serial.print("\t");
+  Serial.println(IMU.getTemperature_C(),6);
+  delay(20);
 }
