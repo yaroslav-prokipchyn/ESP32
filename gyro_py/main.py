@@ -1,5 +1,5 @@
 from machine import I2C, Pin
-from mpu.mpu9250 import MPU9250
+from mpu9250 import MPU9250
 
 def do():
     print("MPU9250 example")
@@ -14,9 +14,9 @@ def do():
     while True:
         print("tick")
         print("tick")
+        print("tick")
         # print("Acceleration:", mpu.acceleration)
         # print("Gyro:", mpu.gyro)
         # print("Magnet:", mpu.magnetic)
         # print("Temperature:", mpu.temperature)
-
         time.sleep(1)
